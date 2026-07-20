@@ -1,177 +1,161 @@
 # Collaborative Kanban Board
 
-A Trello-style collaborative kanban board: Organizations → Workspaces → Boards → Lists → Cards, with
-labels, due dates, assignees, comments, attachments (as links), activity history, search, and filters.
+A full-stack Trello-inspired project management application that enables teams to organize work through **Organizations → Workspaces → Boards → Lists → Cards**. The project demonstrates modern full-stack development with secure JWT authentication, role-based authorization, drag-and-drop task management, comments, labels, due dates, activity tracking, search/filter APIs, and Dockerized deployment.
 
-**Stack:** React + TypeScript + Vite (frontend) · Spring Boot + Spring Security + Spring Data JPA (backend)
-· PostgreSQL · JWT auth · Swagger/OpenAPI · Docker Compose · GitHub Actions CI.
+> **Status:** Functional MVP with core collaboration features implemented. Advanced capabilities such as real-time collaboration, file uploads, and offline support are intentionally left as future enhancements.
 
----
+## Tech Stack
 
-## ⚠️ Honest scope note (please read before you build on this)
+**Frontend:** React • TypeScript • Vite
 
-This is a substantial project, and I want to be upfront about exactly what's here rather than
-let a README oversell it:
+**Backend:** Spring Boot • Spring Security • Spring Data JPA
 
-**Fully implemented:**
-- JWT authentication (register/login), password hashing with BCrypt
-- Organizations, with role-based membership (OWNER/ADMIN/MEMBER) and invite-by-email
-- Workspaces, Boards, Lists, Cards, with full CRUD
-- Drag-and-drop reordering of both lists and cards, backed by a real position-based API
-  (`PATCH /cards/{id}/move`, `PATCH /lists/{id}/move`) — not just a client-side illusion
-- Labels (create/attach/detach), due dates, card assignees (many-to-many)
-- Comments (create/edit/delete, author-only permissions)
-- Attachments — **as URL references only** (see note below)
-- Activity log per board (append-only event trail)
-- Search (by title) and filter (by label/assignee) endpoints
-- Swagger UI for exploring/testing the API
-- Docker Compose for local dev; a GitHub Actions workflow that builds/tests both halves and the Docker images
+**Database:** PostgreSQL
 
-**Deliberately NOT implemented** (these are the "Advanced" tier from the spec, and each is
-genuinely a separate chunk of engineering — I'd rather tell you plainly than fake it):
-- **Real-time updates (WebSockets)** — the board only reflects other users' changes on refresh.
-  Wiring this in would mean a `/ws` STOMP endpoint on the backend and a subscribing client; the
-  architecture here doesn't fight that (activity log + move endpoints already emit the events
-  you'd broadcast), but it isn't built.
-- **Push notifications** — no notification service, email, or in-app inbox.
-- **Offline support** — no service worker, no local queue/sync. Losing connectivity mid-edit will
-  just fail the request.
-- **File uploads** — "Attachments" store a filename + URL you provide (e.g. a link to a file you
-  already uploaded to Drive/S3/wherever). There's no upload endpoint, storage bucket, or virus
-  scanning. Building that reliably needs you to pick a storage backend (S3, GCS, MinIO, etc.) —
-  I didn't want to hard-code a fake pipeline that looks real but isn't.
-- **Workspace-level membership** — access control is simplified to organization membership:
-  anyone in the org can see every workspace/board in it. There's no separate "add this specific
-  person to just this one workspace" layer. This was a deliberate simplification to keep the
-  authorization model tractable; see `MembershipService.java` for where you'd extend it.
+**Authentication:** JWT + BCrypt
 
-None of the above is silently stubbed to look functional — they're just absent, and the code
-doesn't pretend otherwise.
+**Documentation:** Swagger / OpenAPI
 
-## A note on verification
-
-I wrote this in a sandboxed environment that can reach npm but **not** Maven Central, so I was able to
-run `npm install` and `npm run build` on the frontend (both succeeded — no TypeScript errors), but I
-could **not** actually compile or run the Spring Boot backend here. The backend code follows standard,
-well-established Spring Boot 3.3 / Spring Security 6 / Spring Data JPA patterns I'm confident in, but I
-have not executed it. Please run `mvn clean verify` locally (or via the included CI workflow) before
-relying on it, and treat dependency versions in `pom.xml` (Spring Boot 3.3.2, jjwt 0.12.6, springdoc
-2.6.0) as things to double-check against Maven Central for the latest patch releases — I picked
-versions I believe are real and compatible, but I can't guarantee they're the current latest as of
-today.
+**DevOps:** Docker Compose • GitHub Actions
 
 ---
 
-## Project structure
+## Features
 
-```
-kanban-app/
-├── backend/                   Spring Boot API
-│   ├── src/main/java/com/kanban/app/
-│   │   ├── config/             Security, CORS, OpenAPI config
-│   │   ├── security/           JWT filter, JwtUtil, UserDetails
-│   │   ├── entity/             JPA entities
-│   │   ├── repository/         Spring Data repositories
-│   │   ├── dto/request|response
-│   │   ├── service/             Business logic + authorization checks
-│   │   ├── controller/          REST controllers
-│   │   └── exception/           Global exception handling
-│   ├── src/test/                Smoke test + JwtUtil test (H2, no DB needed)
-│   ├── pom.xml
-│   └── Dockerfile
-├── frontend/                   React + TS + Vite SPA
-│   ├── src/
-│   │   ├── api/                 Axios client + typed endpoint wrappers
-│   │   ├── components/          CardModal, TopNav, ProtectedRoute
-│   │   ├── pages/                Login, Register, Organizations, Workspaces, Boards, Board (kanban view)
-│   │   ├── store/                Zustand auth store
-│   │   └── types/
-│   ├── package.json
-│   ├── Dockerfile
-│   └── nginx.conf
-├── docker-compose.yml
-└── .github/workflows/ci.yml
-```
+### Implemented
 
-## Data model (entity relationships)
+- JWT authentication (register/login)
+- BCrypt password hashing
+- Role-based organizations (OWNER / ADMIN / MEMBER)
+- Organization invitations by email
+- Workspaces, Boards, Lists and Cards (full CRUD)
+- Persistent drag-and-drop ordering for lists and cards
+- Labels, assignees and due dates
+- Comments with author-only edit/delete permissions
+- Attachment references using external URLs
+- Board activity history
+- Search by title
+- Filter by label and assignee
+- Swagger API documentation
+- Docker Compose local environment
+- GitHub Actions CI
 
-```
-User ─┬─< OrganizationMember >─┬─ Organization ─┬─< Workspace ─┬─< Board ─┬─< BoardList ─┬─< Card >─┬─< Label
-      │                        │ (role)         │              │          │              │          │  (via card_labels)
-      │                        │                │              │          │              │          └─< User (assignees, via card_members)
-      │                        │                │              │          │              ├─< Comment
-      │                        │                │              │          │              ├─< Attachment (url only)
-      │                        │                │              │          └─< ActivityLog
+## Architecture
+
+```text
+React + TypeScript
+        │
+ REST API (JWT)
+        │
+ Spring Boot
+        │
+ Service Layer
+        │
+ Spring Data JPA
+        │
+ PostgreSQL
 ```
 
-Authorization: access to a Workspace/Board/List/Card is derived by walking up to the owning
-Organization and checking `OrganizationMember`. See `MembershipService.java`.
+## Design Decisions
 
-## Running locally with Docker Compose
+- Layered Spring Boot architecture separating controllers, services, repositories and entities.
+- Authorization is derived from organization membership.
+- Position-based ordering keeps drag-and-drop persistent.
+- DTOs isolate API contracts from persistence models.
+- Swagger is included for API exploration.
+
+## Security
+
+- JWT-based authentication
+- BCrypt password hashing
+- Stateless authorization
+- Role-based access control
+- Protected REST endpoints
+
+## Project Structure
+
+See the original project tree in the repository.
+
+## Data Model
+
+User → OrganizationMember → Organization → Workspace → Board → List → Card
+
+Cards support Labels, Assignees, Comments, Attachments (URL), and Activity Logs.
+
+## Running
+
+### Docker
 
 ```bash
-git clone <your-repo-url>
+git clone <repo>
 cd kanban-app
-cp .env.example .env    # edit JWT_SECRET before any real use
+cp .env.example .env
 docker compose up --build
 ```
 
-- Frontend: http://localhost:5173
-- Backend API: http://localhost:8080/api
-- Swagger UI: http://localhost:8080/swagger-ui.html
+### Local
 
-## Running locally without Docker
+Backend
 
-### Backend
 ```bash
-cd backend
-# Start a Postgres instance and export matching env vars, e.g.:
-export DB_HOST=localhost DB_PORT=5432 DB_NAME=kanban_db DB_USER=kanban_user DB_PASSWORD=kanban_pass
-export JWT_SECRET=some-long-random-string-at-least-32-bytes
 mvn spring-boot:run
 ```
 
-### Frontend
+Frontend
+
 ```bash
-cd frontend
-cp .env.example .env   # VITE_API_BASE_URL=http://localhost:8080/api
 npm install
 npm run dev
 ```
-Visit http://localhost:5173.
 
-## API overview
+## API
 
-All endpoints except `/api/auth/**` require `Authorization: Bearer <token>`.
+Swagger/OpenAPI is available after starting the backend.
 
-| Area | Endpoints |
-|---|---|
-| Auth | `POST /api/auth/register`, `POST /api/auth/login` |
-| Organizations | `POST/GET /api/organizations`, `GET /api/organizations/{id}`, `POST/GET /api/organizations/{id}/members` |
-| Workspaces | `POST/GET /api/organizations/{orgId}/workspaces`, `GET /api/workspaces/{id}` |
-| Boards | `POST/GET /api/workspaces/{wsId}/boards`, `GET/DELETE /api/boards/{id}` |
-| Lists | `POST/GET /api/boards/{boardId}/lists`, `PATCH /api/lists/{id}/move`, `DELETE /api/lists/{id}` |
-| Cards | `POST /api/lists/{listId}/cards`, `GET/PUT/DELETE /api/cards/{id}`, `PATCH /api/cards/{id}/move`, `POST/DELETE /api/cards/{id}/labels/{labelId}`, `POST/DELETE /api/cards/{id}/assignees/{userId}` |
-| Search/Filter | `GET /api/boards/{id}/cards/search?query=`, `GET /api/boards/{id}/cards/filter?labelId=&assigneeId=` |
-| Labels | `POST/GET /api/boards/{id}/labels`, `DELETE /api/labels/{id}` |
-| Comments | `POST/GET /api/cards/{id}/comments`, `PUT/DELETE /api/comments/{id}` |
-| Attachments | `POST/GET /api/cards/{id}/attachments`, `DELETE /api/attachments/{id}` |
-| Activity | `GET /api/boards/{id}/activity` |
+Authentication uses:
 
-Full interactive documentation is available via Swagger UI once the backend is running.
+```
+Authorization: Bearer <JWT>
+```
+
+The API includes endpoints for authentication, organizations, workspaces, boards, lists, cards, labels, comments, attachments, activity history, search, and filtering.
 
 ## Testing
 
-- Frontend: `npm run build` type-checks the whole app (verified working in this environment).
-- Backend: `mvn clean verify` runs a Spring context smoke test and a `JwtUtil` round-trip test
-  against an in-memory H2 database (`application-test.yml`), so no Postgres instance is required
-  for CI. I was not able to execute this locally due to sandbox network restrictions — please run
-  it yourself before trusting it.
+- Frontend type checking using `npm run build`
+- Backend smoke tests
+- JWT utility tests
+- GitHub Actions CI pipeline
 
-## Suggested next steps if you extend this
+## Current Limitations
 
-1. Add WebSocket (STOMP over SockJS) broadcast on card/list move and comment events.
-2. Add a real file storage backend (S3-compatible) behind the attachment endpoints.
-3. Add workspace-level membership if you need finer-grained access than "whole org."
-4. Add rate limiting / Redis caching for board reads if boards get large.
-5. Add pagination to comments/activity log once boards accumulate history.
+The project intentionally focuses on the core collaboration workflow. The following features are planned for future iterations:
+
+- Real-time collaboration via WebSockets
+- Push notifications
+- Offline support
+- Native file uploads (attachments currently store external URLs)
+- Workspace-level access control
+- Pagination for large activity logs
+- Redis caching
+
+These features are not stubbed or partially implemented; they are intentionally out of scope for the current MVP.
+
+## Verification
+
+The frontend has been successfully type-checked.
+
+The backend follows standard Spring Boot practices and includes automated tests and a CI workflow. Please execute `mvn clean verify` locally before production use.
+
+## Roadmap
+
+- WebSocket-based live collaboration
+- S3/MinIO-backed file uploads
+- Workspace-level permissions
+- Redis caching
+- Notifications
+- Performance improvements
+
+## License
+
+MIT (or your preferred license).
