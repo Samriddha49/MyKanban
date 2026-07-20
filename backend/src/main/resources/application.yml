@@ -27,7 +27,7 @@ jwt:
   expiration-ms: ${JWT_EXPIRATION_MS:86400000}
 
 app:
-  frontend-url: ${FRONTEND_URL:http://localhost:5173}
+  frontend-url: https://mykanbanui.onrender.com
 
 springdoc:
   api-docs:
