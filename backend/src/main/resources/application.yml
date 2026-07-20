@@ -26,6 +26,9 @@ jwt:
   secret: ${JWT_SECRET:change-this-to-a-long-random-secret-value-in-production-min-32-bytes}
   expiration-ms: ${JWT_EXPIRATION_MS:86400000}
 
+app:
+  frontend-url: ${FRONTEND_URL:http://localhost:5173}
+
 springdoc:
   api-docs:
     path: /v3/api-docs
